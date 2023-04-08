@@ -1,0 +1,14 @@
+*.db
+*.log
+*.tgz
+.docs
+.env
+.junk
+.npm
+.nyc_output
+.tgz
+.vscode
+build
+coverage
+node_modules
+storage
