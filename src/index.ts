@@ -28,7 +28,7 @@ async function handler(dbFolder?: string, seed?: string) {
       }
 
       if (domains.length === 0) {
-        domainsDb.insertAsync({ domain });
+        await domainsDb.insertAsync({ domain });
       }
 
       await enqueueLinks({
@@ -44,4 +44,4 @@ async function handler(dbFolder?: string, seed?: string) {
   crawler.run(seeds);
 }
 
-handler();
+handler(process.argv[2], process.argv[3]);

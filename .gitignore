@@ -4,6 +4,7 @@
 .docs
 .env
 .junk
+.junk
 .npm
 .nyc_output
 .tgz
