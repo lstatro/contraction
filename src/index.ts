@@ -41,7 +41,7 @@ async function handler(dbFolder?: string, seed?: string) {
     seeds.push(seed);
   }
 
-  crawler.run(seeds);
+  await crawler.run(seeds);
 }
 
 handler(process.argv[2], process.argv[3]);
