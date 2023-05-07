@@ -1,11 +1,13 @@
-import { CheerioCrawler, EnqueueStrategy, log } from 'crawlee';
+import { log, CheerioCrawler, EnqueueStrategy } from 'crawlee';
 import Datastore from '@seald-io/nedb';
 import path from 'path';
+import axios from 'axios';
 
 async function handler(dbFolder?: string, seed?: string) {
   const basePath = dbFolder || './';
   const urlsDbPath = path.resolve(basePath, 'urls.db');
   const domainsDbPath = path.resolve(basePath, 'domains.db');
+
   const urlsDb = new Datastore({ filename: urlsDbPath, autoload: true });
   const domainsDb = new Datastore({ filename: domainsDbPath, autoload: true });
 
@@ -15,21 +17,38 @@ async function handler(dbFolder?: string, seed?: string) {
   });
 
   const crawler = new CheerioCrawler({
-    async requestHandler({ request, enqueueLinks }) {
+    async requestHandler({ request, enqueueLinks, $ }) {
       log.info(request.url);
 
-      const domain = new URL(request.url).hostname;
+      const url = new URL(request.url);
 
-      const urls = await urlsDb.findAsync({ url: request.url });
-      const domains = await domainsDb.findAsync({ domain });
+      const urlRegex =
+        // eslint-disable-next-line no-useless-escape
+        /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g;
 
-      if (urls.length === 0) {
-        await urlsDb.insertAsync({ url: request.url });
-      }
+      const html = $.html();
+      const urlsInHtml = html.match(urlRegex) || [];
 
-      if (domains.length === 0) {
-        await domainsDb.insertAsync({ domain });
-      }
+      const axiosRequest = await axios.get(request.url);
+
+      const raw = axiosRequest.data.match(urlRegex) || [];
+
+      const foundUrls = Array.from(new Set([...urlsInHtml, ...raw]));
+
+      await urlsDb.updateAsync(
+        { url: request.url },
+        {
+          url: request.url,
+          observed: foundUrls,
+        },
+        { upsert: true }
+      );
+
+      await domainsDb.updateAsync(
+        { hostname: url.hostname },
+        { hostname: url.hostname },
+        { upsert: true }
+      );
 
       await enqueueLinks({
         strategy: EnqueueStrategy.SameDomain,
@@ -42,6 +61,8 @@ async function handler(dbFolder?: string, seed?: string) {
   }
 
   await crawler.run(seeds);
+  await urlsDb.compactDatafileAsync();
+  await domainsDb.compactDatafileAsync();
 }
 
 handler(process.argv[2], process.argv[3]);
